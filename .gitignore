@@ -37,3 +37,6 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+data/NOW_raw/
+data/NOW_preprocessed/BLM_filtered_preprocessed_news_sources_df.csv

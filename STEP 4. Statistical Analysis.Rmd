@@ -1,0 +1,257 @@
+---
+title: "STEP 4. Statistical Analysis"
+author: "Veronika Juhasz"
+date: "2/5/2022"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+knitr::opts_chunk$set(echo = TRUE)
+
+pacman::p_load("tidyverse", "dplyr", "ggplot2", "lme4", "lattice", "ggrepel")
+
+getwd()
+
+```
+
+### Reading in data and shaping it up for later work ###
+
+```{r}
+SV_df_raw <- read_csv("./data/NOW_preprocessed/SV_BLM_bias_connotation_combined.csv") %>% 
+  rename("Perspective_ws" = "Perspective(ws)") %>% 
+  select(ID, Date, S_string, V_lemmatized, Perspective_ws, media_bias_rating, Side)
+
+
+VO_df_raw <- read_csv("./data/NOW_preprocessed/VO_BLM_bias_connotation_combined.csv") %>% 
+  rename("Perspective_wo" = "Perspective(wo)") %>% 
+  select(ID, Date, O_string, V_lemmatized, Perspective_wo, media_bias_rating, Side)
+
+
+print(sum(is.na(SV_df_raw$media_bias_rating)))
+print(sum(is.na(VO_df_raw$media_bias_rating)))
+
+
+# SV datasets
+
+SV_df <-  SV_df_raw %>% 
+  drop_na(media_bias_rating) %>% 
+  filter(Side != "0") %>% 
+  mutate(
+    SO_BLM_role = Side) %>% 
+  rename(
+    Subject_or_object = S_string,
+    Sympathy_score = Perspective_ws,
+    Political_alignment_rating = media_bias_rating)
+SV_df$SO_BLM_role[SV_df$SO_BLM_role == 1] <- "anti-BLM-SO"
+SV_df$SO_BLM_role[SV_df$SO_BLM_role == -1] <- "pro-BLM-SO"
+
+# VO datasets
+
+VO_df <-  VO_df_raw %>% 
+  drop_na(media_bias_rating) %>% 
+  filter(Side != "0") %>% 
+  mutate(
+    SO_BLM_role = Side) %>% 
+  rename(
+    Subject_or_object = O_string,
+    Sympathy_score = Perspective_wo,
+    Political_alignment_rating = media_bias_rating)
+VO_df$SO_BLM_role[VO_df$SO_BLM_role == 1] <- "anti-BLM-SO"
+VO_df$SO_BLM_role[VO_df$SO_BLM_role == -1] <- "pro-BLM-SO"
+
+
+# combining into one full dataset
+
+total_df <- rbind(SV_df, VO_df)
+
+proBLM_SO_df <- total_df %>% 
+  filter(SO_BLM_role == "pro-BLM-SO")
+antiBLM_SO_df <- total_df %>% 
+  filter(SO_BLM_role == "anti-BLM-SO")
+
+  
+# changing the order of the levels of political alignment
+
+SV_df$Political_alignment_rating <- factor(SV_df$Political_alignment_rating, levels = c("Left", "Lean Left", "Center", "Lean Right", "Right"))
+VO_df$Political_alignment_rating <- factor(VO_df$Political_alignment_rating, levels = c("Left", "Lean Left", "Center", "Lean Right", "Right"))
+total_df$Political_alignment_rating <- factor(total_df$Political_alignment_rating, levels = c("Left", "Lean Left", "Center", "Lean Right", "Right"))
+proBLM_SO_df$Political_alignment_rating <- factor(proBLM_SO_df$Political_alignment_rating, levels = c("Left", "Lean Left", "Center", "Lean Right", "Right"))
+antiBLM_SO_df$Political_alignment_rating <- factor(antiBLM_SO_df$Political_alignment_rating, levels = c("Left", "Lean Left", "Center", "Lean Right", "Right"))
+```
+
+
+
+### Doing some data cleaning and reshaping the data for plotting ###
+
+
+```{r}
+
+total_df_filtered <- total_df %>% 
+  dplyr::filter(grepl("^Breonna$|^Breonna Taylor$|^Floyd$|^George Floyd$|^movement$|^Black Lives Matter$|^BLM$|^protester$|^protesters$|^demonstrator$|^demonstrators$|^police$|^National Guard$|^Blue Lives Matter$|^government$" , Subject_or_object, ignore.case = TRUE)) %>% 
+  mutate_at("Subject_or_object", str_replace_all, "^Breonna$", "Breonna Taylor") %>% 
+  mutate_at("Subject_or_object", str_replace_all, "^Floyd$", "George Floyd") %>% 
+  mutate_at("Subject_or_object", str_replace_all, "^Trayvon$", "Trayvon Martin") %>% 
+  mutate_at("Subject_or_object", str_replace_all, "^movement$", "Black Lives Matter") %>% 
+  mutate_at("Subject_or_object", str_replace_all, "^Movement$", "Black Lives Matter") %>% 
+  mutate_at("Subject_or_object", str_replace_all, "^BLM$", "Black Lives Matter") %>% 
+  mutate_at("Subject_or_object", str_replace_all, "^blm$", "Black Lives Matter") %>% 
+  mutate_at("Subject_or_object", str_replace_all, "^protesters$", "protester") %>%
+  mutate_at("Subject_or_object", str_replace_all, "^Protesters$", "protester") %>% 
+  mutate_at("Subject_or_object", str_replace_all, "^Protester$", "protester") %>% 
+  mutate_at("Subject_or_object", str_replace_all, "^PROTESTERS$", "protester") %>% 
+  mutate_at("Subject_or_object", str_replace_all, "^demonstrators$", "demonstrator") %>% 
+  mutate_at("Subject_or_object", str_replace_all, "^Demonstrators$", "demonstrator") %>% 
+  mutate_at("Subject_or_object", str_replace_all, "^Demonstrator$", "demonstrator") %>% 
+  mutate_at("Subject_or_object", str_replace_all, "^Police$", "police") %>% 
+  mutate_at("Subject_or_object", str_replace_all, "^Government$", "government")
+
+
+table(total_df_filtered$Subject_or_object)
+
+
+total_df_filtered_forplot <- total_df_filtered %>% 
+  mutate(
+      Political_alignment_of_news_source = Political_alignment_rating) %>% 
+  filter(
+    Political_alignment_of_news_source != "Center") %>% 
+  mutate_at("Political_alignment_of_news_source", str_replace_all, "^Left$", "Liberal") %>% 
+  mutate_at("Political_alignment_of_news_source", str_replace_all, "^Lean Left$", "Liberal") %>% 
+  mutate_at("Political_alignment_of_news_source", str_replace_all, "^Right$", "Conservative") %>% 
+  mutate_at("Political_alignment_of_news_source", str_replace_all, "^Lean Right", "Conservative")
+
+
+table(total_df_filtered_forplot$Political_alignment_of_news_source)
+
+total_df_filtered_forplot_liberal <-  total_df_filtered_forplot %>%
+  filter(Political_alignment_of_news_source == "Liberal") %>% 
+  group_by(Subject_or_object) %>% 
+  summarise(Sympathy_score = mean(Sympathy_score))  %>% 
+  rename(Sympathy_score_liberal = Sympathy_score)
+total_df_filtered_forplot_liberal$SO_BLM_role <- ifelse(
+  grepl("police|National Guard|government", total_df_filtered_forplot_liberal$Subject_or_object), "anti-BLM-SO", "pro-BLM-SO")
+
+
+total_df_filtered_forplot_conservative <-  total_df_filtered_forplot %>%
+  filter(Political_alignment_of_news_source == "Conservative") %>% 
+  group_by(Subject_or_object) %>% 
+  summarise(Sympathy_score = mean(Sympathy_score)) %>% 
+  rename(Sympathy_score_conservative = Sympathy_score)
+total_df_filtered_forplot_conservative$SO_BLM_role <- ifelse(
+  grepl("police|National Guard|government", total_df_filtered_forplot_conservative$Subject_or_object), "anti-BLM-SO", "pro-BLM-SO")
+
+summary_df <- left_join(total_df_filtered_forplot_liberal, total_df_filtered_forplot_conservative, by = "Subject_or_object")
+
+```
+
+
+
+### Making some plots ###
+
+```{r}
+total_df_filtered_proBLMSO <- total_df_filtered %>% 
+  filter(SO_BLM_role == "pro-BLM-SO")
+
+total_df_filtered_antiBLMSO <- total_df_filtered %>% 
+  filter(SO_BLM_role == "anti-BLM-SO")
+
+
+ggplot(total_df_filtered_proBLMSO, aes(x= Political_alignment_rating, y = Sympathy_score, fill = Political_alignment_rating)) +
+  stat_summary(fun.y = mean,
+               geom = "bar",
+               width = 0.6) +
+  stat_summary(fun.data = mean_se,
+               geom = "errorbar",
+               width = 0.2) +
+  labs(x = "Political Alignment Rating", y = "Mean empathy score towards pro-BLM figures", title = "Mean empathy score towards pro-BLM figures with SE Error Bars" ) +
+  theme_minimal()
+
+
+ggplot(total_df_filtered_antiBLMSO, aes(x= Political_alignment_rating, y = Sympathy_score, fill = Political_alignment_rating)) +
+  stat_summary(fun.y = mean,
+               geom = "bar",
+               width = 0.6) +
+  stat_summary(fun.data = mean_se,
+               geom = "errorbar",
+               width = 0.2) +
+  labs(x = "Political Alignment Rating", y = "Mean empathy score towards anti-BLM figures", title = "Mean empathy score towards anti-BLM figures with SE Error Bars" ) +
+  theme_minimal()
+
+
+```
+### Making more plots ###
+
+```{r}
+interaction.plot(x.factor = total_df_filtered$Political_alignment_rating, #x-axis variable
+                 trace.factor = total_df_filtered$SO_BLM_role, #variable for lines
+                 response = total_df_filtered$Sympathy_score, #y-axis variable
+                 fun = mean, #metric to plot
+                 ylab = "Mean Sympathy score",
+                 xlab = "Political Alignment Rating of news source",
+                 col = c("red", "blue"),
+                 lty = 1, #line type
+                 lwd = 2, #line width
+                 trace.label = "Pro- or anti BLM figures")
+
+
+ggplot(total_df_filtered, aes(x= Political_alignment_rating, y = Sympathy_score, color = SO_BLM_role)) +
+  stat_summary(fun.y = mean,
+               geom = "point",
+               width = 0.6) +
+  stat_summary(fun.data = mean_se,
+               geom = "errorbar",
+               width = 0.2) +
+  scale_color_manual(name = "BLM-related figures role\nin the BLM movement",
+                         labels=c("pro-BLM-SO" = "pro-BLM role",
+                                  "anti-BLM-SO" = "anti-BLM role"),
+                         values = c("pro-BLM-SO" = "blue", 
+                                    "anti-BLM-SO" = "red")) +
+  labs(x = "Political Alignment Rating of News Source", y = "Mean sympathy score towards pro- and anti-BLM figures", title = "Mean sympathy score towards BLM-related figures in news media with \ndifferent political alignment - with SE Error Bars" ) +
+  theme_minimal()
+
+ 
+ggplot(summary_df, aes(x = Sympathy_score_conservative, y = Sympathy_score_liberal, color = SO_BLM_role.y, label = Subject_or_object)) +
+  geom_point() +
+  geom_abline() +
+#  geom_label(aes(label = Subject_or_object, size = NULL), nudge_y = 0.01) +
+#  geom_text() +
+  geom_label_repel(aes(label = Subject_or_object),
+                  box.padding   = 0.3, 
+                  point.padding = 0.3,
+                  segment.color = 'grey50') +
+  theme(legend.position = "left") +
+#  expand_limits(y = c(0.5, 0.5)) +
+  scale_color_manual(name = "BLM-related figures role\nin the BLM movement",
+                         labels=c("pro-BLM-SO" = "pro-BLM role",
+                                  "anti-BLM-SO" = "anti-BLM role"),
+                         values = c("pro-BLM-SO" = "blue", 
+                                    "anti-BLM-SO" = "red")) +
+  labs(x = "Mean sympathy score by conservative news sources", y = "Mean Sympathy score by liberal news sources", title = "Mean sympathy score towards BLM-related figures in news media" ) +
+  theme_minimal()
+
+
+```
+### Making the model ###
+
+```{r}
+m1 <- lmerTest::lmer(Sympathy_score ~ Political_alignment_rating * SO_BLM_role + (1|ID), data = total_df_filtered)
+summary(m1)
+
+round(summary(m1)$coefficients, 5)
+```
+
+## A more interpretable version of the same model, with political alignment being a continuous varibale instead of categorical ###
+
+```{r}
+total_df_filtered_cont <- total_df_filtered %>%
+  mutate(Political_alignment_rating_cont = as.numeric(Political_alignment_rating))
+  
+m1_cont <- lmerTest::lmer(Sympathy_score ~ Political_alignment_rating_cont * SO_BLM_role + (1|ID), data = total_df_filtered_cont)
+summary(m1_cont)
+
+round(summary(m1_cont)$coefficients, 5)
+```
+
+
