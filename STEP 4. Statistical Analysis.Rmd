@@ -148,39 +148,6 @@ summary_df <- left_join(total_df_filtered_forplot_liberal, total_df_filtered_for
 
 
 
-### Making some plots ###
-
-```{r}
-total_df_filtered_proBLMSO <- total_df_filtered %>% 
-  filter(SO_BLM_role == "pro-BLM-SO")
-
-total_df_filtered_antiBLMSO <- total_df_filtered %>% 
-  filter(SO_BLM_role == "anti-BLM-SO")
-
-
-ggplot(total_df_filtered_proBLMSO, aes(x= Political_alignment_rating, y = Empathy_score, fill = Political_alignment_rating)) +
-  stat_summary(fun.y = mean,
-               geom = "bar",
-               width = 0.6) +
-  stat_summary(fun.data = mean_se,
-               geom = "errorbar",
-               width = 0.2) +
-  labs(x = "Political Alignment Rating", y = "Mean empathy score towards pro-BLM figures", title = "Mean empathy score towards pro-BLM figures with SE Error Bars" ) +
-  theme_minimal()
-
-
-ggplot(total_df_filtered_antiBLMSO, aes(x= Political_alignment_rating, y = Empathy_score, fill = Political_alignment_rating)) +
-  stat_summary(fun.y = mean,
-               geom = "bar",
-               width = 0.6) +
-  stat_summary(fun.data = mean_se,
-               geom = "errorbar",
-               width = 0.2) +
-  labs(x = "Political Alignment Rating", y = "Mean empathy score towards anti-BLM figures", title = "Mean empathy score towards anti-BLM figures with SE Error Bars" ) +
-  theme_minimal()
-
-
-```
 ### Making more plots ###
 
 ```{r}
@@ -196,10 +163,13 @@ interaction.plot(x.factor = total_df_filtered$Political_alignment_rating, #x-axi
                  trace.label = "Pro- or anti BLM figures")
 
 
-ggplot(total_df_filtered, aes(x= Political_alignment_rating, y = Empathy_score, color = SO_BLM_role)) +
+ggplot(total_df_filtered, aes(x= Political_alignment_rating, y = Empathy_score, group = SO_BLM_role, color = SO_BLM_role)) +
   stat_summary(fun.y = mean,
                geom = "point",
                width = 0.6) +
+  stat_summary(fun.y = mean,
+               geom = "line",
+               alpha = 0.5) +
   stat_summary(fun.data = mean_se,
                geom = "errorbar",
                width = 0.2) +
@@ -208,15 +178,14 @@ ggplot(total_df_filtered, aes(x= Political_alignment_rating, y = Empathy_score, 
                                   "anti-BLM-SO" = "anti-BLM role"),
                          values = c("pro-BLM-SO" = "blue", 
                                     "anti-BLM-SO" = "red")) +
-  labs(x = "Political alignment rating of news source", y = "Mean empathy score towards pro- and anti-BLM figures", title = "Mean Empathy Score Towards BLM-related Figures in News Media with \nDifferent Political Alignment - with SE Error Bars" ) +
+  labs(x = "\nPolitical alignment rating of news source", y = "Mean empathy score towards pro- and anti-BLM figures\n", title = "Mean Empathy Score Towards BLM-related Figures in News Media with \nDifferent Political Alignment - with SE Error Bars" ) +
   theme_minimal()
+
 
  
 ggplot(summary_df, aes(x = Empathy_score_conservative, y = Empathy_score_liberal, color = SO_BLM_role.y, label = Subject_or_object)) +
   geom_point() +
   geom_abline() +
-#  geom_label(aes(label = Subject_or_object, size = NULL), nudge_y = 0.01) +
-#  geom_text() +
   geom_label_repel(aes(label = Subject_or_object),
                   box.padding   = 0.3, 
                   point.padding = 0.3,
@@ -228,7 +197,7 @@ ggplot(summary_df, aes(x = Empathy_score_conservative, y = Empathy_score_liberal
                                   "anti-BLM-SO" = "anti-BLM role"),
                          values = c("pro-BLM-SO" = "blue", 
                                     "anti-BLM-SO" = "red")) +
-  labs(x = "Mean empathy score by conservative news sources", y = "Mean empathy score by liberal news sources", title = "Mean Empathy Score Towards BLM-related Figures in News Media" ) +
+  labs(x = "\nMean empathy score by conservative news sources", y = "Mean empathy score by liberal news sources\n", title = "Mean Empathy Score Towards BLM-related Figures in News Media" ) +
   theme_minimal()
 
 
@@ -271,10 +240,76 @@ ggplot(total_df_filtered_forplot_main, aes(x = SO_BLM_role, y = Empathy_score, c
                geom = "errorbar",
                width = 0.2) +
   scale_color_manual(values = c("red", "blue")) +
-  labs(x = "BLM-related figures' role in the BLM movement", y = "Mean empathy score in news reporting", title = "Main Effect of BLM-related Figures Pro- or Anti-BLM Role on\nEmpathy Score with SE Error Bars" ) +
+  labs(x = "\nBLM-related figures' role in the BLM movement", y = "Mean empathy score in news reporting\n", title = "Main Effect of BLM-related Figures Pro- or Anti-BLM Role on\nEmpathy Score with SE Error Bars" ) +
   theme_minimal()
 
 
+```
+
+```{r}
+citation()
+
+R.version
+```
+
+
+```{r}
+total_df_filtered_forplot_cons <- total_df_filtered_forplot %>% 
+  filter(SO_BLM_role == "anti-BLM-SO")
+
+total_df_filtered_forplot_cons_sum <- total_df_filtered_forplot_cons %>% # the names of the new data frame and the data frame to be summarised
+  group_by(Political_alignment_of_news_source, Subject_or_object) %>% # the grouping variable
+  dplyr::summarise(
+    mean = mean(Empathy_score), # calculates the mean of each group
+    sd = sd(Empathy_score), # calculates the standard deviation of each group
+    n_es = n(), # calculates the sample size per group
+    SE = sd(Empathy_score) / sqrt(n())
+  ) # calculates the standard error of each group
+
+  
+# with white error bar
+
+ggplot(total_df_filtered_forplot_cons_sum, aes(x = Subject_or_object, y = mean, fill = Political_alignment_of_news_source)) +
+  geom_bar(position = "dodge", stat = "identity", width = 0.7) +
+  geom_errorbar(aes(ymin = mean - SE, ymax = mean + SE), width = 0.5, size = 0.5, position = position_dodge(0.7)) +
+  geom_errorbar(aes(ymin = mean - SE, ymax = mean), width = 0.0, size = 0.5, position = position_dodge(0.7), color = "white") +
+  theme(legend.position = "left") +
+  scale_fill_manual(name = "Political Alignment \nof News Outlet",
+                         values = c("Liberal" = "blue", 
+                                    "Conservative" = "red")) +
+  labs(x = "\nBLM-related figures (anti-BLM)", y = "Mean empathy score in  news reporting\n", title = "Mean Empathy Score Towards Anti-BLM Figures", subtitle = "with SE Error Bars" ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(face = "bold", size = "10", angle= 25, hjust=1, color = "black"))
+
+
+total_df_filtered_forplot_lib <- total_df_filtered_forplot %>% 
+  filter(SO_BLM_role == "pro-BLM-SO")
+
+total_df_filtered_forplot_lib_sum <- total_df_filtered_forplot_lib %>% # the names of the new data frame and the data frame to be summarised
+  group_by(Political_alignment_of_news_source, Subject_or_object) %>% # the grouping variable
+  dplyr::summarise(
+    mean = mean(Empathy_score), # calculates the mean of each group
+    sd = sd(Empathy_score), # calculates the standard deviation of each group
+    n_es = n(), # calculates the sample size per group
+    SE = sd(Empathy_score) / sqrt(n())
+  ) # calculates the standard error of each group
+
+
+# with white error bar
+
+ggplot(total_df_filtered_forplot_lib_sum, aes(x = Subject_or_object, y = mean, fill = Political_alignment_of_news_source)) +
+  geom_bar(position = "dodge", stat = "identity", width = 0.7) +
+  geom_errorbar(aes(ymin = mean - SE, ymax = mean + SE), width = 0.5, size = 0.5, position = position_dodge(0.7)) +
+  geom_errorbar(aes(ymin = mean - SE, ymax = mean), width = 0.0, size = 0.5, position = position_dodge(0.7), color = "white") +
+  theme(legend.position = "left") +
+  scale_fill_manual(name = "Political Alignment \nof News Outlet",
+                         values = c("Liberal" = "blue", 
+                                    "Conservative" = "red")) +
+  labs(x = "\nBLM-related figures (pro-BLM)", y = "Mean empathy score in news reporting\n", title = "Mean Empathy Score Towards Pro-BLM Figures", subtitle = "with SE Error Bars" ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(face = "bold", size = "10", angle= 25, hjust=1, color = "black"))
+
+  
 ```
 
 
