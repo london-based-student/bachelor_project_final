@@ -5,17 +5,14 @@ date: "2/5/2022"
 output: html_document
 ---
 
+### Loading packages and checking directory
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-
-knitr::opts_chunk$set(echo = TRUE)
-
 pacman::p_load("tidyverse", "dplyr", "ggplot2", "lme4", "lattice", "ggrepel")
-
 getwd()
-
 ```
+
 
 ### Reading in data and shaping it up for later work ###
 
@@ -24,11 +21,9 @@ SV_df_raw <- read_csv("./data/NOW_preprocessed/SV_BLM_bias_connotation_combined.
   rename("Perspective_ws" = "Perspective(ws)") %>% 
   select(ID, Date, S_string, V_lemmatized, Perspective_ws, media_bias_rating, Side)
 
-
 VO_df_raw <- read_csv("./data/NOW_preprocessed/VO_BLM_bias_connotation_combined.csv") %>% 
   rename("Perspective_wo" = "Perspective(wo)") %>% 
   select(ID, Date, O_string, V_lemmatized, Perspective_wo, media_bias_rating, Side)
-
 
 print(sum(is.na(SV_df_raw$media_bias_rating)))
 print(sum(is.na(VO_df_raw$media_bias_rating)))
@@ -62,7 +57,6 @@ VO_df <-  VO_df_raw %>%
 VO_df$SO_BLM_role[VO_df$SO_BLM_role == 1] <- "anti-BLM-SO"
 VO_df$SO_BLM_role[VO_df$SO_BLM_role == -1] <- "pro-BLM-SO"
 
-
 # combining into one full dataset
 
 total_df <- rbind(SV_df, VO_df)
@@ -72,7 +66,6 @@ proBLM_SO_df <- total_df %>%
 antiBLM_SO_df <- total_df %>% 
   filter(SO_BLM_role == "anti-BLM-SO")
 
-  
 # changing the order of the levels of political alignment
 
 SV_df$Political_alignment_rating <- factor(SV_df$Political_alignment_rating, levels = c("Left", "Lean Left", "Center", "Lean Right", "Right"))
@@ -82,10 +75,7 @@ proBLM_SO_df$Political_alignment_rating <- factor(proBLM_SO_df$Political_alignme
 antiBLM_SO_df$Political_alignment_rating <- factor(antiBLM_SO_df$Political_alignment_rating, levels = c("Left", "Lean Left", "Center", "Lean Right", "Right"))
 ```
 
-
-
 ### Doing some data cleaning and reshaping the data for plotting ###
-
 
 ```{r}
 
@@ -111,7 +101,6 @@ total_df_filtered <- total_df %>%
 
 table(total_df_filtered$Subject_or_object)
 
-
 total_df_filtered_forplot <- total_df_filtered %>% 
   mutate(
       Political_alignment_of_news_source = Political_alignment_rating) %>% 
@@ -121,7 +110,6 @@ total_df_filtered_forplot <- total_df_filtered %>%
   mutate_at("Political_alignment_of_news_source", str_replace_all, "^Lean Left$", "Liberal") %>% 
   mutate_at("Political_alignment_of_news_source", str_replace_all, "^Right$", "Conservative") %>% 
   mutate_at("Political_alignment_of_news_source", str_replace_all, "^Lean Right", "Conservative")
-
 
 table(total_df_filtered_forplot$Political_alignment_of_news_source)
 
@@ -133,7 +121,6 @@ total_df_filtered_forplot_liberal <-  total_df_filtered_forplot %>%
 total_df_filtered_forplot_liberal$SO_BLM_role <- ifelse(
   grepl("police|National Guard|government", total_df_filtered_forplot_liberal$Subject_or_object), "anti-BLM-SO", "pro-BLM-SO")
 
-
 total_df_filtered_forplot_conservative <-  total_df_filtered_forplot %>%
   filter(Political_alignment_of_news_source == "Conservative") %>% 
   group_by(Subject_or_object) %>% 
@@ -143,12 +130,9 @@ total_df_filtered_forplot_conservative$SO_BLM_role <- ifelse(
   grepl("police|National Guard|government", total_df_filtered_forplot_conservative$Subject_or_object), "anti-BLM-SO", "pro-BLM-SO")
 
 summary_df <- left_join(total_df_filtered_forplot_liberal, total_df_filtered_forplot_conservative, by = "Subject_or_object")
-
 ```
 
-
-
-### Making more plots ###
+### Plotting ###
 
 ```{r}
 interaction.plot(x.factor = total_df_filtered$Political_alignment_rating, #x-axis variable
@@ -227,7 +211,6 @@ round(summary(m1_cont)$coefficients, 5)
 
 ```{r}
 
-
 total_df_filtered_forplot_main <-  total_df_filtered_forplot
 total_df_filtered_forplot_main$SO_BLM_role <- ifelse(
   grepl("police|National Guard|government", total_df_filtered_forplot_main$Subject_or_object), "anti-BLM role", "pro-BLM role")
@@ -243,15 +226,9 @@ ggplot(total_df_filtered_forplot_main, aes(x = SO_BLM_role, y = Empathy_score, c
   labs(x = "\nBLM-related figures' role in the BLM movement", y = "Mean empathy score in news reporting\n", title = "Main Effect of BLM-related Figures Pro- or Anti-BLM Role on\nEmpathy Score with SE Error Bars" ) +
   theme_minimal()
 
-
 ```
 
-```{r}
-citation()
-
-R.version
-```
-
+### Creating plot for each pro- and anti-BLM figure's empathy score
 
 ```{r}
 total_df_filtered_forplot_cons <- total_df_filtered_forplot %>% 
@@ -310,6 +287,13 @@ ggplot(total_df_filtered_forplot_lib_sum, aes(x = Subject_or_object, y = mean, f
   theme(axis.text.x = element_text(face = "bold", size = "10", angle= 25, hjust=1, color = "black"))
 
   
+```
+
+### Checking current version of R and how to cite it ###
+
+```{r}
+citation()
+R.version
 ```
 
 
